@@ -1,103 +1,98 @@
-# Evaluation summary (STEP 18)
+# Evaluation summary
 
-This note compares the Living Room designer against the **fixed** ship gates. Thresholds were not changed after seeing scores.
+This note compares the Living Room designer against the **fixed** ship gates using the current golden set (**25 cases**). Thresholds were not changed after seeing scores.
 
-LLM-as-judge **is implemented** (STEP 17). Quality scores come from `python -m app.evaluation.runner` (structured 1–5 rubric). Deterministic SQLite/layout/budget checks remain authoritative; the judge cannot mark a factual failure as a pass.
+LLM-as-judge is implemented. Quality scores come from `python -m app.evaluation.runner` (structured 1–5 rubric). Deterministic SQLite / layout / budget checks remain authoritative; the judge cannot mark a factual failure as a pass.
+
+**Current run:** `evals/results/latest.json` / `evals/results/latest_summary.txt`  
+**Generated at:** `2026-09-06T15:03:17Z`  
+**Cases:** 25/25 deterministic pass
 
 ## Ship gates
 
 ### Hard gates
 
-| Gate | Target | Baseline | Post-fix | Status |
-| --- | --- | --- | --- | --- |
-| Catalogue validity | 100% | 100% (25/25) | 100% (25/25) | Pass |
-| Stock compliance | 100% where applicable | 100% (19/19) | 100% (19/19) | Pass |
-| Budget compliance | 100% | 100% (25/25) | 100% (25/25) | Pass |
-| Guardrail compliance | 100% | 100% (25/25) | 100% (25/25) | Pass |
-| Tool-use compliance | 100% where applicable | 100% (25/25) | 100% (25/25) | Pass |
+| Gate | Target | Current | Status |
+| --- | --- | --- | --- |
+| Catalogue validity | 100% | 100% (25/25) | Pass |
+| Stock compliance | 100% where applicable | 100% (14/14) | Pass |
+| Budget compliance | 100% | 100% (25/25) | Pass |
+| Guardrail compliance | 100% | 100% (25/25) | Pass |
+| Tool-use compliance | 100% where applicable | 100% (25/25) | Pass |
 
 ### Quality gates
 
-| Gate | Target | Baseline | Post-fix | Status |
-| --- | --- | --- | --- | --- |
-| Fit correctness | ≥ 95% where supported | 100% (19/19) | 100% (19/19) | Pass |
-| Must-have coverage | ≥ 90% | 100% (20/20)* | 100% (20/20)* | Pass |
-| Average LLM quality | ≥ 4.0 / 5 | **2.88** (n=25) | **3.30** (n=25) | **Fail** |
+| Gate | Target | Current | Status |
+| --- | --- | --- | --- |
+| Fit correctness | ≥ 95% where supported | 100% (14/14) | Pass |
+| Must-have coverage | ≥ 90% | 100% (20/20)* | Pass |
+| Average LLM quality | ≥ 4.0 / 5 | **3.81** (n=25) | **Fail** |
 
 \*Coverage pass-rate uses each golden case’s `min_coverage` (partial/empty plans are allowed on tight-budget and missing-SKU briefs). It is not “every must-have phrase was physically sourced.”
 
-Baseline judge run: `evals/results/eval_20260905T155224Z.json`  
-Post-fix judge run: `evals/results/eval_20260905T160424Z.json` (also `latest.json`)
+**Deterministic failures:** none.
 
-## Failed gate: average LLM quality
+## LLM judge (current)
 
-### Root cause
+| Dimension | Score |
+| --- | --- |
+| Overall mean | **3.81** |
+| Relevance | 4.60 |
+| Style coherence | 3.64 |
+| Explanation quality | 3.48 |
+| Trade-off quality | 3.96 |
+| Customer usefulness | 3.36 |
 
-The judge’s low scores were **not** inventing SKUs or breaking budget/stock. They were mostly:
+Normal style synthetics and clear guardrail refusals often score ~4.0+. Exact-budget seating (`ADV-exact-budget` → SOF-008) scored **4.60**.
 
-1. **Cheapest-SKU selection** ignored `style_tags`. Almost every sofa was SOF-008 (Minimalist futon), including Scandinavian, Mid-Century, Contemporary, and premium briefs.
-2. **Customer text leaked internals** (`SQLite`, occupancy, re-plan tokens, MAX_REPLANS).
-3. **“Lighting” expanded to three fixture categories**, so schemes looked cluttered and under-explained.
-4. **Catalogue/data limits** the judge still penalises: no Togo/Noguchi/Cassina rows; CFT-004 has NULL price so it cannot be sold; BR-06’s ₹20,000 is below SOF-008 ₹36,000; dining tables are Dining-only; SOF-004 does not fit 240×210 cm.
+### Fact contradictions (judge flag)
 
-### Classification
+The judge set `honours_deterministic_facts=false` on:
 
-| Issue | Type | Action |
-| --- | --- | --- |
-| Always pick cheapest SKU / ignore style tags | **Code** | Prefer `style_tags` match, then 3-seater width when asked, then price; spend up only on explicit premium/high-end briefs |
-| “from SQLite” / re-plan dumps in the plan | **Code** | Customer-facing `why_selected`, summary, trade-offs; skip success-path scope boilerplate |
-| Three lights for one “lighting” phrase | **Code** | Map plain “lighting” to floor lamp; keep three fixtures only for “layered lighting” |
-| Absent named designer pieces, NULL prices, ₹20k vs ₹36k sofa, dining-in-living-room | **Data** | No invented products; documented as remaining limitations |
-| Judge wanting CFT-004 sold despite NULL price | **Evaluation** | Deterministic policy wins; quality score still counts |
+| Case | Notes |
+| --- | --- |
+| BR-09 | Presenting a 3-seater as covering an L-sectional / incomplete disclosure of dining omission |
+| ADV-oversized-sofa | Vague “no valid combination” framing vs the decisive spatial conflict (300 cm sectional vs 240×210 room) |
 
-### Fix applied (smallest high-impact)
+These flags do **not** flip deterministic pass/fail.
 
-In `app/agent/graph.py` and `app/agent/requirements.py` only:
+## Failed gate: average LLM quality (≥ 4.0)
 
-- Style-tag-aware ranking of in-stock, priced Living Room rows
-- 3-seater vs loveseat preference when the brief says so
-- Premium briefs prefer higher-priced **style-matched** SKUs (still never over budget after replan)
-- One lighting category unless the brief asks for layered lighting
-- Copy without SQLite / MAX_REPLANS / raw replan tokens
+Hard factual gates pass. The remaining quality gap is mainly **customer usefulness and explanation clarity** on honest empty / blocked plans—not invented SKUs or broken budget/stock.
 
-No thresholds were lowered. No fake catalogue rows.
-
-### Post-fix LLM dimension means (n=25)
-
-| Dimension | Baseline | Post-fix |
-| --- | --- | --- |
-| Overall | 2.88 | 3.30 |
-| Relevance | 3.44 | 3.80 |
-| Style coherence | 2.64 | 3.52 |
-| Explanation quality | 2.56 | 3.04 |
-| Trade-off quality | 3.24 | 3.36 |
-| Customer usefulness | 2.52 | 2.76 |
-
-Normal style synthetics and guardrail refusals now often sit at ~4.0. BR-01 uses SOF-001 (Scandinavian 3-seater) instead of SOF-008.
-
-## Remaining failures (quality, not facts)
-
-These cases still score &lt; 3.0 after the fix. Deterministic checks still pass.
+### Notable low scores (mean &lt; 3.0)
 
 | Case | Mean | Why the judge is unhappy (and why we do not “fix” it with invented SKUs) |
 | --- | --- | --- |
-| ADV-absent-named-product | 1.40 | Cassina LC3 / Noguchi are not in the catalogue |
-| ADV-oversized-sofa | 1.80 | SOF-004 (300×170) cannot fit 240×210; substitute seating is not the named sectional |
-| BR-09 | 2.00 | Same size conflict plus dining table is Dining-tagged only |
-| BR-06 | 2.00 | ₹20,000 &lt; cheapest sofa ₹36,000 |
-| ADV-null-price | 2.20 | CFT-004 has NULL `price_inr`; it is not sold |
-| BR-08 | 2.40 | Togo sofa and Noguchi table are absent; only an Eames-style chair exists |
-| BR-14 | 2.40 | Premium brief still cannot fully match “designer statement” from 72 SKUs |
+| ADV-out-of-stock | 2.80 | SOF-006 is out of stock and correctly excluded; explanation does not give a clear next step (waitlist / substitute / revise brief) |
+| ADV-null-price | 2.60 | CFT-004 has NULL `price_inr` and cannot be sold; response is honest but vague about the specific blocker |
+| ADV-oversized-sofa | 2.60 | Required sectional cannot fit 240×210; empty plan is correct, but the decisive fit reason is under-explained |
 
-**Ship recommendation:** hard factual gates pass; **do not ship as quality-complete** until average LLM quality is ≥ 4.0 or the product explicitly accepts catalogue-bound substitutions.
+Other mid scores (still deterministic pass): BR-06 **3.00**, BR-08 **3.00**, BR-09 **3.20**, BR-14 **3.20**, ADV-absent-named-product **3.60**.
+
+### Context vs earlier STEP 18 snapshot
+
+| | Earlier post-fix (STEP 18 docs) | Current (`latest.json`) |
+| --- | --- | --- |
+| Overall mean | 3.30 | **3.81** |
+| Relevance | 3.80 | 4.60 |
+| Style coherence | 3.52 | 3.64 |
+| Explanation quality | 3.04 | 3.48 |
+| Trade-off quality | 3.36 | 3.96 |
+| Customer usefulness | 2.76 | 3.36 |
+
+Quality improved versus the Sept 5 post-fix write-up, but the **≥ 4.0** ship gate still fails.
+
+**Ship recommendation:** hard factual gates pass; **do not ship as quality-complete** until average LLM quality is ≥ 4.0 or the product explicitly accepts catalogue-bound / empty-plan explanation quality as sufficient.
 
 ## Known limitations
 
-- Layout is a rectangle/height/occupancy-≤1.0 check, not circulation or a floor plan (`docs/layout_methodology.md`).
-- Style match is CSV `style_tags` equality, not embeddings.
+- Layout is a rectangle/height/occupancy check, not circulation or a floor plan (`docs/layout_methodology.md`).
+- Style match uses catalogue `style_tags`, not embeddings.
 - Must-have coverage in the harness is category-level (and case `min_coverage`), not named-SKU retrieval.
 - Judge scores vary run-to-run; they never override SQLite prices, stock, or fit.
 - Living Room MVP only; structural, guarantee, and other-room requests are refused by design.
+- Catalogue data limits remain: no Togo/Noguchi/Cassina LC3 rows; CFT-004 NULL price; SOF-006 out of stock; BR-06 ₹20,000 below cheapest sofa ₹36,000; SOF-004 does not fit 240×210 cm.
 
 ## How to reproduce
 
@@ -105,4 +100,4 @@ These cases still score &lt; 3.0 after the fix. Deterministic checks still pass.
 python -m app.evaluation.runner
 ```
 
-Outputs: `evals/results/latest.json`, `evals/results/latest_summary.txt`.
+Uses the configured golden set (~25 cases). Outputs: `evals/results/latest.json`, `evals/results/latest_summary.txt` (same run).
