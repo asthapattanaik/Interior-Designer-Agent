@@ -1,0 +1,9 @@
+# Pinned after checking Python 3.11.4 and current PyPI releases.
+# OpenAI is used through LangChain (langchain-openai), not a direct SDK import in app code.
+langchain==1.4.0
+langgraph==1.2.11
+langchain-openai==1.6.0
+pydantic==2.13.5
+python-dotenv==1.2.3
+streamlit==1.63.0
+pytest==9.1.1
