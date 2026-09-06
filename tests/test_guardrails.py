@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from app.agent.guardrails import ScopeGuardrail, heuristic_classify, llm_classifier
+from app.agent.guardrails import (
+    ScopeGuardrail,
+    heuristic_classify,
+    is_unsupported_guarantee_request,
+    llm_classifier,
+)
 from app.agent.prompts import ScopeDecision, ScopeLabel
 from app.models.brief import RoomBrief
 from app.validation.normalize import (
@@ -143,6 +148,57 @@ def test_guardrail_guarantee_request():
     decision = heuristic_classify("Guarantee that this furniture will arrive tomorrow.")
     assert decision.label == ScopeLabel.UNSUPPORTED_GUARANTEE
     assert decision.proceed is False
+
+
+@pytest.mark.parametrize(
+    ("text", "should_block"),
+    [
+        ("Spend exactly ₹36,000.", False),
+        ("Guarantee that the final price is exactly ₹36,000.", True),
+        ("I need everything delivered before the 25th.", False),
+        ("Guarantee everything will be delivered before the 25th.", True),
+        ("Exact price requirement: total should be ₹36,000 if a sofa exists.", False),
+        ("Guaranteed final price of ₹36,000 — do not change it.", True),
+        ("I want to stay under ₹50,000", False),
+        ("Guarantee I will stay under ₹50,000", True),
+        ("Spend exactly this amount if a sofa exists at this price", False),
+        ("Please furnish the whole room for one rupee.", False),
+        ("Lock the final discounted price now and do not change it.", True),
+        ("Guarantee everything is delivered and installed before the 25th.", True),
+    ],
+)
+def test_guarantee_detection_distinguishes_constraints_from_promises(
+    text: str, should_block: bool
+):
+    assert is_unsupported_guarantee_request(text) is should_block
+    decision = heuristic_classify(
+        f"room_type=Living Room\nmust_haves=sofa\ncustomer_note={text}"
+    )
+    if should_block:
+        assert decision.label == ScopeLabel.UNSUPPORTED_GUARANTEE
+        assert decision.proceed is False
+    else:
+        assert decision.label == ScopeLabel.LIVING_ROOM_DESIGN
+        assert decision.proceed is True
+
+
+def test_graph_allows_exact_budget_constraint_without_guarantee():
+    brief = RoomBrief(
+        room_type="Living Room",
+        length_cm=480,
+        width_cm=360,
+        ceiling_cm=300,
+        budget_inr=36000,
+        style_preference="Minimalist",
+        must_haves="sofa",
+        constraints="Spend exactly this amount if a sofa exists at this price",
+        customer_note="Cheapest acceptable seating only.",
+    )
+    result = InteriorDesignAgent().invoke(brief)
+    assert result["scope_decision"].label == ScopeLabel.LIVING_ROOM_DESIGN
+    assert result["scope_decision"].proceed is True
+    joined = "\n".join(result["messages"])
+    assert "tool:catalog_search" in joined
 
 
 def test_graph_unsupported_room_does_not_call_tools():

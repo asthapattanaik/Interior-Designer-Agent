@@ -35,12 +35,17 @@ Return structured fields:
 - redirect: how to use the supported Living Room furniture designer
 
 Rules:
-- living_room_design: furniture/styling a living room.
+- living_room_design: furniture/styling a living room, including normal budget caps, exact spend targets, and preferred delivery/move-in timing stated as constraints or preferences (not as contractual promises).
 - unsupported_room_type: bedroom, kitchen, dining-only, kids room, study as the requested room, etc.
 - structural_construction: knocking down walls, load-bearing questions, demolition, moving plumbing.
-- unsupported_guarantee: promising delivery dates, locking discounts, guaranteeing tomorrow arrival or a final price.
+- unsupported_guarantee: ONLY when the customer demands a promise, certainty, contractual commitment, locked quote, or assurance about delivery/price — e.g. "guarantee", "promise", "assure me", "lock the final price", "firm quote that will not change".
 - ambiguous: cannot tell if this is a Living Room furniture brief.
 
+Critical distinction — constraints vs guarantees:
+- ALLOW (living_room_design): "Spend exactly ₹36,000.", "I want to stay under ₹50,000.", "I need everything delivered before the 25th.", "Please furnish the whole room for one rupee.", "Cheapest acceptable seating only."
+- BLOCK (unsupported_guarantee): "Guarantee that the final price is exactly ₹36,000.", "Guarantee everything will be delivered before the 25th.", "Guarantee I will stay under ₹50,000.", "Lock the final discounted price now."
+
+Do NOT treat exact budgets, tight budgets, or delivery preferences alone as unsupported_guarantee.
 Do NOT recommend products, prices, stock, dimensions, or whether furniture fits.
 Do NOT decide if a wall is load-bearing.
 """

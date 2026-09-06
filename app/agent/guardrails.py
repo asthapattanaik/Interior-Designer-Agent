@@ -33,6 +33,36 @@ def _request_text(brief: RoomBrief | None, extra_text: str = "") -> str:
     return "\n".join(parts).strip()
 
 
+def is_unsupported_guarantee_request(text: str) -> bool:
+    """True only for commitment/promise language about delivery or price.
+
+    Budget caps, exact spend targets, and delivery preferences alone are NOT
+    guarantees. Requires explicit assurance / lock / promise wording.
+    """
+    blob = text.lower()
+    commitment_markers = (
+        "guarantee",
+        "guaranteed",
+        "guaranteeing",
+        "promise that",
+        "promise me",
+        "promised",
+        "assure me",
+        "assured that",
+        "lock the final",
+        "lock the price",
+        "lock in the price",
+        "locked price",
+        "firm quote",
+        "price will not change",
+        "do not change it",
+        "warranty that",
+        "commit to the price",
+        "commit to delivery",
+    )
+    return any(marker in blob for marker in commitment_markers)
+
+
 def heuristic_classify(text: str) -> ScopeDecision:
     """Offline stand-in used when no LLM is injected. Tests should mock the LLM path."""
     blob = text.lower()
@@ -59,17 +89,7 @@ def heuristic_classify(text: str) -> ScopeDecision:
                 "share room size, budget, and style without construction work."
             ),
         )
-    if any(
-        token in blob
-        for token in (
-            "guarantee",
-            "guaranteed",
-            "arrive tomorrow",
-            "lock the final",
-            "lock the price",
-            "delivered and installed before",
-        )
-    ):
+    if is_unsupported_guarantee_request(text):
         return ScopeDecision(
             label=ScopeLabel.UNSUPPORTED_GUARANTEE,
             proceed=False,
