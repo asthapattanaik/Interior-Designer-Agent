@@ -435,20 +435,3 @@ else:
             "it isn't a full floor plan or a guarantee of exact placement."
         ],
     )
-
-tech_lines: list[str] = []
-fit_tech = _public(plan.fit_status_technical)
-if fit_tech:
-    tech_lines.append(f"Fit: {fit_tech}")
-for line in plan.tradeoffs_technical:
-    cleaned = _public(line)
-    if cleaned:
-        tech_lines.append(f"Trade-off: {cleaned}")
-for line in plan.limitations_technical:
-    cleaned = _public(line)
-    if cleaned:
-        tech_lines.append(f"Limitation: {cleaned}")
-if tech_lines:
-    with st.expander("Technical details", expanded=False):
-        for line in tech_lines:
-            st.write(line)
